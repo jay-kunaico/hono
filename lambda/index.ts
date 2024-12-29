@@ -7,7 +7,13 @@ const TABLE_NAME = process.env.TABLE_NAME!;
 
 // Route to add an item
 app.get('/add', async (c) => {
-  const item = { id: '123', name: 'example' }; // Replace with actual data
+  console.log('Request data:', c.req);
+  const id = c.req.query('id');
+  const name = c.req.query('name');
+  if (!id || !name) {
+    return c.json({ error: 'Missing id or name' }, 400);
+  }
+  const item = { id, name };
   try {
     await ddb.put({ TableName: TABLE_NAME, Item: item }).promise();
     return c.json({ message: 'Item added' }, 200);
