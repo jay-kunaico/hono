@@ -4,20 +4,12 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as path from 'path';
 
 export class HonoServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // Define the Lambda function
-    const fn = new NodejsFunction(this, 'lambda', {
-      entry: 'lambda/index.ts',
-      handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
-    });
-    const functionUrl = fn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    });
 
     // Create a DynamoDB table
     const table = new dynamodb.Table(this, 'MyTable', {
@@ -26,11 +18,34 @@ export class HonoServiceStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // NOT recommended for production
     });
 
+    // Define the Lambda function
+    const fn = new NodejsFunction(this, 'lambda', {
+      entry: path.join(__dirname, '../lambda/index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+    });
+    fn.addEnvironment('TABLE_NAME', table.tableName);
+
+    const functionUrl = fn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
     // Grant the Lambda function read/write permissions
     table.grantReadWriteData(fn);
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
+        resources: [table.tableArn],
+      })
+    );
 
-    // Pass the table name to the Lambda function as an environment variable
-    fn.addEnvironment('TABLE_NAME', table.tableName);
+    // Add permission for function URL invocation
+    fn.addPermission('LambdaUrlPermission', {
+      principal: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      action: 'lambda:InvokeFunctionUrl',
+      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
+    });
 
     // Set up API Gateway
     new apigw.LambdaRestApi(this, 'HonoApiGateway', {
@@ -44,6 +59,17 @@ export class HonoServiceStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'LambdaFunctionUrl', {
       value: functionUrl.url,
       description: 'The URL for the Lambda function',
+    });
+
+    // Output the Lambda function name and ARN
+    new cdk.CfnOutput(this, 'LambdaFunctionName', {
+      value: fn.functionName,
+      description: 'Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'LambdaFunctionArn', {
+      value: fn.functionArn,
+      description: 'Lambda function ARN',
     });
   }
 }
