@@ -1,5 +1,5 @@
 {
   "httpMethod": "POST",
   "path": "/add",
-  "body": "{\"id\":\"4\",\"name\":\"test4\"}"
+  "body": "{\"id\":\"6\",\"name\":\"Edmonton Oilers\",\"Stanley Cups\":\"5\"}"
 }

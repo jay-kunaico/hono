@@ -25,13 +25,16 @@ app.use('*', async (c, next) => {
 app.post('/add', async (c) => {
   console.log('Received request for /add');
   try {
-    const { id, name } = await c.req.json();
+    const body = await c.req.json();
+    const { id, name, ...rest } = body;
+    console.log('Parsed request body:', body);
     console.log('Parsed request body:', { id, name });
+
     if (!id || !name) {
       console.log('Missing id or name');
       return c.json({ error: 'Missing id or name' }, 400);
     }
-    const item = { id, name };
+    const item = { id, name, ...rest };
     await ddb.put({ TableName: TABLE_NAME, Item: item }).promise();
     console.log('Item added:', item);
     return c.json({ message: 'Item added' }, 200);
