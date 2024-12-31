@@ -1,10 +1,10 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigw from 'aws-cdk-lib/aws-apigateway';
-import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 
 export class HonoServiceStack extends cdk.Stack {
@@ -40,36 +40,44 @@ export class HonoServiceStack extends cdk.Stack {
       })
     );
 
-    // Add permission for function URL invocation
-    fn.addPermission('LambdaUrlPermission', {
-      principal: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
-      action: 'lambda:InvokeFunctionUrl',
-      functionUrlAuthType: lambda.FunctionUrlAuthType.NONE,
+    // Create an API Gateway REST API
+    const api = new apigateway.RestApi(this, 'HonoServiceApi', {
+      restApiName: 'Hono Service',
+      description: 'This service serves Hono requests.',
     });
 
-    // Set up API Gateway
-    new apigw.LambdaRestApi(this, 'HonoApiGateway', {
-      handler: fn,
-      deployOptions: {
-        stageName: 'dev',
+    // Create an API key
+    const apiKey = api.addApiKey('ApiKey');
+
+    // Create a usage plan
+    const usagePlan = api.addUsagePlan('UsagePlan', {
+      name: 'Basic',
+      throttle: {
+        rateLimit: 10,
+        burstLimit: 2,
       },
     });
 
-    // Output the Lambda function URL
-    new cdk.CfnOutput(this, 'LambdaFunctionUrl', {
-      value: functionUrl.url,
-      description: 'The URL for the Lambda function',
+    // Associate the API key with the usage plan
+    usagePlan.addApiKey(apiKey);
+
+    // Associate the usage plan with the API Gateway stage
+    usagePlan.addApiStage({
+      stage: api.deploymentStage,
     });
 
-    // Output the Lambda function name and ARN
-    new cdk.CfnOutput(this, 'LambdaFunctionName', {
-      value: fn.functionName,
-      description: 'Lambda function name',
+    // Create a Lambda integration
+    const lambdaIntegration = new apigateway.LambdaIntegration(fn);
+
+    // Define API Gateway resources and methods
+    const addResource = api.root.addResource('add');
+    addResource.addMethod('POST', lambdaIntegration, {
+      apiKeyRequired: true,
     });
 
-    new cdk.CfnOutput(this, 'LambdaFunctionArn', {
-      value: fn.functionArn,
-      description: 'Lambda function ARN',
+    const fetchResource = api.root.addResource('fetch');
+    fetchResource.addMethod('GET', lambdaIntegration, {
+      apiKeyRequired: true,
     });
   }
 }
