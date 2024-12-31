@@ -12,3 +12,6 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 * `npx cdk deploy`  deploy this stack to your default AWS account/region
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
+
+## command to run in VSC terminal
+aws lambda invoke --function-name HonoServiceStack-lambda8B5974B5-2LBc474PXp49 --payload fileb://lambda/payload.json response.json
